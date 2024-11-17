@@ -1,15 +1,18 @@
-    class EmulatorDebugger {
-        constructor(scene) {
-            this.scene = scene;
-            this.windows = [];
-            this.advancedMode = false;
-            this.currentTab = 'RAM';
-            this.scrollPosition = 0;
-            this.contentLines = [];
-            this.visibleLines = 20; // Adjust based on your window size and font
-            this.isVisible = false;
-            this.switchOffX = 0;
-            this.switchOnX = 0;
+class EmulatorDebugger {
+    constructor(scene) {
+        this.scene = scene;
+        this.windows = [];
+        this.advancedMode = false;
+        this.currentTab = 'RAM';
+        this.scrollPosition = 0;
+        this.contentLines = [];
+        this.visibleLines = 20; // Adjust based on your window size and font
+        this.isVisible = false;
+        this.switchOffX = 0;
+        this.switchOnX = 0;
+        this.romViewScrollPosition = 0;
+        this.romViewVisibleLines = 20; // Adjust this based on your window size
+        this.lastEmulatorState = null;
         }
         toggleDebugWindows() {
             if (!this.isVisible) {
@@ -180,73 +183,62 @@
                 this.updateAdvancedWindow(this.scene.emulator);
             }
         }
-        updateAdvancedWindow(emulator) {
-            if (this.windows[3]) {
-                switch (this.currentTab) {
-                    case 'RAM':
-                        this.contentLines = this.formatMemoryDump(emulator.memory.ram, 0, emulator.memory.ram.length).split('\n');
-                        break;
-                    case 'VRAM':
-                        this.contentLines = this.formatMemoryDump(emulator.gpu.vram, 0, emulator.gpu.vram.length).split('\n');
-                        break;
-                    case 'CRAM':
-                        this.contentLines = this.formatColorRAM(emulator.gpu.colorPalette, 0, emulator.gpu.colorPalette.length).split('\n');
-                        break;
-                    case 'ROM':
-                        this.contentLines = this.formatMemoryDump(emulator.memory.rom, 0, emulator.memory.rom.length).split('\n');
-                        break;
-                }
-                const visibleContent = this.contentLines.slice(this.scrollPosition, this.scrollPosition + this.visibleLines).join('\n');
-                this.windows[3].setText('content', visibleContent);
+    updateAdvancedWindow(emulator) {
+        if (this.windows[3]) {
+            switch (this.currentTab) {
+                case 'RAM':
+                    this.contentLines = this.formatMemoryDump(emulator.memory.ram, 0, emulator.memory.ram.length).split('\n');
+                    break;
+                case 'VRAM':
+                    this.contentLines = this.formatMemoryDump(emulator.gpu.vram, 0, emulator.gpu.vram.length).split('\n');
+                    break;
+                case 'CRAM':
+                    this.contentLines = this.formatColorRAM(emulator.gpu.colorPalette, 0, emulator.gpu.colorPalette.length).split('\n');
+                    break;
+                case 'ROM':
+                    this.updateROMView(emulator);
+                    return; // Exit early as ROM view is handled separately
             }
+            const visibleContent = this.contentLines.slice(this.scrollPosition, this.scrollPosition + this.visibleLines).join('\n');
+            this.windows[3].setText('content', visibleContent);
         }
-      updateROMView(emulator) {
-    if (this.currentTab === 'ROM' && this.windows[3]) {
-        const startAddress = this.romViewScrollPosition * 16;
-        const endAddress = Math.min(startAddress + this.romViewVisibleLines * 16, emulator.memory.rom.length);
-        
-        const visibleContent = this.formatMemoryDump(emulator.memory.rom, startAddress, endAddress);
-        this.windows[3].setText('content', visibleContent);
-        
-        // Update scroll bar
-        const totalLines = Math.ceil(emulator.memory.rom.length / 16);
-        this.windows[3].setScrollbarRange(totalLines, this.romViewVisibleLines);
-        this.windows[3].setScrollbarPosition(this.romViewScrollPosition);
+        this.lastEmulatorState = emulator;
     }
-}
 
-formatMemoryDump(memory, start, end) {
-    let output = '';
-    for (let i = start; i < end; i += 16) {
-        output += `${i.toString(16).padStart(6, '0')}: `;
-        for (let j = 0; j < 16 && i + j < end; j++) {
-            output += memory[i + j].toString(16).padStart(2, '0') + ' ';
+    updateROMView(emulator) {
+        if (this.currentTab === 'ROM' && this.windows[3]) {
+            const startAddress = this.romViewScrollPosition * 16;
+            const endAddress = Math.min(startAddress + this.romViewVisibleLines * 16, emulator.memory.rom.length);
+            
+            const visibleContent = this.formatMemoryDump(emulator.memory.rom, startAddress, endAddress);
+            this.windows[3].setText('content', visibleContent);
+            
+            // Update scroll bar
+            const totalLines = Math.ceil(emulator.memory.rom.length / 16);
+            this.windows[3].setScrollbarRange(totalLines, this.romViewVisibleLines);
+            this.windows[3].setScrollbarPosition(this.romViewScrollPosition);
         }
-        output += '\n';
     }
-    return output.trim();
-}
 
-// Add this method to handle scrolling
-handleScroll(scrollPosition) {
-    if (this.currentTab === 'ROM') {
-        this.romViewScrollPosition = scrollPosition;
-        this.updateAdvancedWindow(this.lastEmulatorState);
-    }
-}
-        formatColorRAM(colorPalette, start, length) {
-            let result = '';
-            for (let i = start; i < start + length; i += 4) {
-                result += i.toString(16).padStart(4, '0') + ': ';
-                for (let j = 0; j < 4; j++) {
-                    if (i + j < colorPalette.length) {
-                        result += colorPalette[i + j].toString(16).padStart(3, '0') + ' ';
-                    }
-                }
-                result += '\n';
+    formatMemoryDump(memory, start, end) {
+        let output = '';
+        for (let i = start; i < end; i += 16) {
+            output += `${i.toString(16).padStart(6, '0')}: `;
+            for (let j = 0; j < 16 && i + j < end; j++) {
+                output += memory[i + j].toString(16).padStart(2, '0') + ' ';
             }
-            return result;
+            output += '\n';
         }
+        return output.trim();
+    }
+
+    handleScroll(scrollPosition) {
+        if (this.currentTab === 'ROM') {
+            this.romViewScrollPosition = scrollPosition;
+            this.updateAdvancedWindow(this.lastEmulatorState);
+        }
+    }
+
         DebugWindow = class {
             constructor(scene, x, y, width, height) {
                 this.scene = scene;
@@ -291,5 +283,12 @@ updateROMView(emulator) {
         console.log('ROM view updated');
     }
 }
+     setScrollbarRange(total, visible) {
+            // Implement this method to update the scrollbar range
+        }
+
+        setScrollbarPosition(position) {
+            // Implement this method to update the scrollbar position
+        }
 =======
 export default EmulatorDebugger;
