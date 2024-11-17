@@ -260,41 +260,15 @@
             }
         }
     }
-    class Example extends Phaser.Scene {
-        constructor() {
-            super();
-            this.debugger = null;
-        }
-        create() {
-            // Set the background color to black
-            this.cameras.main.setBackgroundColor('#000000');
-            // Create the emulator
-            this.emulator = new Emulator(this);
-            // Reset the emulator
-            this.emulator.reset();
-            // Create debugger
-            this.debugger = new EmulatorDebugger(this);
-            // Add key listener for 'R'
-            this.input.keyboard.on('keydown-R', () => this.debugger.toggleDebugWindows());
-            // Set up 60 FPS timer
-            this.time.addEvent({
-                delay: 1000 / 60,
-                callback: this.runFrame,
-                callbackScope: this,
-                loop: true
-            });
-        }
-        runFrame() {
-            // Run a single step of the emulator
-            this.emulator.step();
-            // Render the screen only if it has changed
-            if (this.emulator.gpu.isDirty) {
-                this.emulator.gpu.renderScreen();
-            }
-            // Update debug windows
-            if (this.debugger.isVisible) {
-                this.debugger.updateWindows(this.emulator);
-            }
-        }
+updateROMView(emulator) {
+    if (this.currentTab === 'ROM' && this.windows[3]) {
+        console.log('Updating ROM view');
+        console.log('ROM data (first 16 bytes):', emulator.memory.rom.slice(0, 16));
+        this.contentLines = this.formatMemoryDump(emulator.memory.rom, 0, emulator.memory.rom.length).split('\n');
+        const visibleContent = this.contentLines.slice(this.scrollPosition, this.scrollPosition + this.visibleLines).join('\n');
+        this.windows[3].setText('content', visibleContent);
+        console.log('ROM view updated');
     }
+}
+=======
 export default EmulatorDebugger;
