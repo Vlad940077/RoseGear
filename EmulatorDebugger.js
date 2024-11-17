@@ -200,19 +200,40 @@
                 this.windows[3].setText('content', visibleContent);
             }
         }
-        formatMemoryDump(memory, start, length) {
-            let result = '';
-            for (let i = start; i < start + length; i += 16) {
-                result += i.toString(16).padStart(4, '0') + ': ';
-                for (let j = 0; j < 16; j++) {
-                    if (i + j < memory.length) {
-                        result += memory[i + j].toString(16).padStart(2, '0') + ' ';
-                    }
-                }
-                result += '\n';
-            }
-            return result;
+      updateROMView(emulator) {
+    if (this.currentTab === 'ROM' && this.windows[3]) {
+        const startAddress = this.romViewScrollPosition * 16;
+        const endAddress = Math.min(startAddress + this.romViewVisibleLines * 16, emulator.memory.rom.length);
+        
+        const visibleContent = this.formatMemoryDump(emulator.memory.rom, startAddress, endAddress);
+        this.windows[3].setText('content', visibleContent);
+        
+        // Update scroll bar
+        const totalLines = Math.ceil(emulator.memory.rom.length / 16);
+        this.windows[3].setScrollbarRange(totalLines, this.romViewVisibleLines);
+        this.windows[3].setScrollbarPosition(this.romViewScrollPosition);
+    }
+}
+
+formatMemoryDump(memory, start, end) {
+    let output = '';
+    for (let i = start; i < end; i += 16) {
+        output += `${i.toString(16).padStart(6, '0')}: `;
+        for (let j = 0; j < 16 && i + j < end; j++) {
+            output += memory[i + j].toString(16).padStart(2, '0') + ' ';
         }
+        output += '\n';
+    }
+    return output.trim();
+}
+
+// Add this method to handle scrolling
+handleScroll(scrollPosition) {
+    if (this.currentTab === 'ROM') {
+        this.romViewScrollPosition = scrollPosition;
+        this.updateAdvancedWindow(this.lastEmulatorState);
+    }
+}
         formatColorRAM(colorPalette, start, length) {
             let result = '';
             for (let i = start; i < start + length; i += 4) {
