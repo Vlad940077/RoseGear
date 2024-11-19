@@ -1,4 +1,4 @@
-        class EmulatorDebugger {
+         class EmulatorDebugger {
             constructor(scene) {
                 this.scene = scene;
                 this.windows = [];
@@ -13,6 +13,9 @@
                 this.romViewScrollPosition = 0;
                 this.romViewVisibleLines = 20; // Adjust this based on your window size
                 this.lastEmulatorState = null;
+                this.lastRegisters = null;
+                this.lastFlags = null;
+                this.lastGeneralInfo = null;
             }
             toggleDebugWindows() {
                 if (!this.isVisible) {
@@ -25,11 +28,13 @@
             createDebugWindows() {
                 // Create the first debug window for registers and flags
                 const window1 = this.createWindow(10, 10, 300, 200);
-                window1.addText('registers', 20, 20);
-                window1.addText('flags', 170, 20);
+                window1.addText('registers', 20, 20, 'Registers:\n');
+                window1.addText('flags', 170, 20, 'Flags:\n');
+
                 // Create the second debug window for general information
                 const window2 = this.createWindow(490, 10, 300, 200);
-                window2.addText('general', 20, 20);
+                window2.addText('general', 20, 20, 'General Info:\nNo game loaded');
+
                 // Create the third debug window at the bottom left, taller
                 const window3 = this.createWindow(10, 480, 300, 110);
                 window3.addText('advancedMode', 20, 20, 'Advanced Mode: off', {
@@ -89,32 +94,57 @@
             }
             updateWindows(emulator) {
                 if (this.windows.length === 0) return;
-                // Update registers and flags
+                // Update registers, shadow registers, and flags only if they've changed
                 const registers = emulator.cpu.getRegisterState();
+                const shadowRegisters = emulator.cpu.getShadowRegisterState();
                 const flags = emulator.cpu.getFlagState();
-                let registerText = 'Registers:\n';
-                for (const [key, value] of Object.entries(registers)) {
-                    registerText += `${key.toUpperCase()}: ${value.toString(16).padStart(2, '0')}\n`;
+                if (JSON.stringify(registers) !== JSON.stringify(this.lastRegisters) ||
+                    JSON.stringify(shadowRegisters) !== JSON.stringify(this.lastShadowRegisters) ||
+                    JSON.stringify(flags) !== JSON.stringify(this.lastFlags)) {
+                    let registerText = 'Registers:\n';
+                    for (const [key, value] of Object.entries(registers)) {
+                        registerText += `${key.toUpperCase()}: ${value.toString(16).padStart(2, '0')}\n`;
+                    }
+                    registerText += '\nShadow Registers:\n';
+                    for (const [key, value] of Object.entries(shadowRegisters)) {
+                        registerText += `${key.toUpperCase()}': ${value.toString(16).padStart(2, '0')}\n`;
+                    }
+                    let flagText = 'Flags:\n';
+                    for (const [key, value] of Object.entries(flags)) {
+                        flagText += `${key.toUpperCase()}: ${value ? '1' : '0'}\n`;
+                    }
+                    this.windows[0].setText('registers', registerText);
+                    this.windows[0].setText('flags', flagText);
+                    this.lastRegisters = registers;
+                    this.lastShadowRegisters = shadowRegisters;
+                    this.lastFlags = flags;
                 }
-                let flagText = 'Flags:\n';
-                for (const [key, value] of Object.entries(flags)) {
-                    flagText += `${key.toUpperCase()}: ${value ? '1' : '0'}\n`;
-                }
-                this.windows[0].setText('registers', registerText);
-                this.windows[0].setText('flags', flagText);
                 // Update general information
+                const generalInfo = {
+                    cycles: emulator.cpu.clock.t,
+                    gameLoaded: emulator.gameLoaded,
+                    ramSize: emulator.memory.ram.length,
+                    romSize: emulator.memory.rom.length,
+                    vramSize: emulator.vdp.vram.length,
+                    cramSize: emulator.vdp.cram.length,
+                    gameName: emulator.gameInfo ? emulator.gameInfo.name : null,
+                    gameSize: emulator.gameInfo ? emulator.gameInfo.size : null
+                };
                 let generalText = 'General Info:\n';
-                generalText += `Cycles: ${emulator.cyclesExecuted}\n`;
-                generalText += `Game Loaded: ${emulator.gameLoaded ? 'Yes' : 'No'}\n`;
-                generalText += `RAM Size: ${emulator.memory.ram.length} bytes\n`;
-                generalText += `ROM Size: ${emulator.memory.rom.length} bytes\n`;
-                generalText += `VRAM Size: ${emulator.gpu.vram.length} bytes\n`;
-                generalText += `CRAM Size: ${emulator.gpu.colorPalette.length * 2} bytes\n`;
-                if (emulator.gameInfo) {
-                    generalText += `Game: ${emulator.gameInfo.name}\n`;
-                    generalText += `Size: ${emulator.gameInfo.size} bytes\n`;
+                generalText += `Cycles: ${generalInfo.cycles}\n`;
+                generalText += `Game Loaded: ${generalInfo.gameLoaded ? 'Yes' : 'No'}\n`;
+                generalText += `RAM Size: ${generalInfo.ramSize} bytes\n`;
+                generalText += `ROM Size: ${generalInfo.romSize} bytes\n`;
+                generalText += `VRAM Size: ${generalInfo.vramSize} bytes\n`;
+                generalText += `CRAM Size: ${generalInfo.cramSize} bytes\n`;
+                if (generalInfo.gameName) {
+                    generalText += `Game: ${generalInfo.gameName}\n`;
+                    generalText += `Size: ${generalInfo.gameSize} bytes\n`;
+                } else {
+                    generalText += 'No game loaded\n';
                 }
                 this.windows[1].setText('general', generalText);
+                this.lastGeneralInfo = generalInfo;
                 // Update advanced mode text
                 if (this.windows[2]) {
                     this.windows[2].setText('advancedMode', `Advanced Mode: ${this.advancedMode ? 'on' : 'off'}`);
@@ -196,10 +226,18 @@
                             this.contentLines = this.formatMemoryDump(emulator.memory.ram, 0, emulator.memory.ram.length).split('\n');
                             break;
                         case 'VRAM':
-                            this.contentLines = this.formatMemoryDump(emulator.gpu.vram, 0, emulator.gpu.vram.length).split('\n');
+                            if (emulator.vdp && emulator.vdp.vram) {
+                                this.contentLines = this.formatMemoryDump(emulator.vdp.vram, 0, emulator.vdp.vram.length).split('\n');
+                            } else {
+                                this.contentLines = ['VRAM not available'];
+                            }
                             break;
                         case 'CRAM':
-                            this.contentLines = this.formatColorRAM(emulator.gpu.colorPalette, 0, emulator.gpu.colorPalette.length).split('\n');
+                            if (emulator.vdp && emulator.vdp.cram) {
+                                this.contentLines = this.formatColorRAM(emulator.vdp.cram, 0, emulator.vdp.cram.length).split('\n');
+                            } else {
+                                this.contentLines = ['CRAM not available'];
+                            }
                             break;
                         case 'ROM':
                             this.updateROMView(emulator);
@@ -237,13 +275,14 @@
                 }
                 return output.trim();
             }
-            formatColorRAM(colorPalette, start, end) {
+            formatColorRAM(cram, start, end) {
+                if (!cram) return 'CRAM data not available';
                 let output = '';
                 for (let i = start; i < end; i += 8) {
                     output += `${i.toString(16).padStart(4, '0')}: `;
                     for (let j = 0; j < 8 && i + j < end; j++) {
-                        const color = colorPalette[i + j];
-                        output += color.toString(16).padStart(4, '0') + ' ';
+                        const color = cram[i + j];
+                        output += (color !== undefined ? color.toString(16).padStart(4, '0') : '????') + ' ';
                     }
                     output += '\n';
                 }
