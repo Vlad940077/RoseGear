@@ -1,4 +1,4 @@
-        class EmulatorDebugger {
+        export class EmulatorDebugger {
             constructor(scene) {
                 this.scene = scene;
                 this.windows = [];
@@ -489,7 +489,7 @@
                 return output.trim();
             }
         }
-        class DebugWindow {
+        export class DebugWindow {
             constructor(scene, x, y, width, height) {
                 this.scene = scene;
                 this.x = x;
@@ -544,6 +544,4 @@
                     this.scrollbar.destroy();
                 }
             }
-        }
-================
-export EmulatorDebugger;
+        
