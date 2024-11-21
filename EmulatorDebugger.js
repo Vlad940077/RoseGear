@@ -489,3 +489,4 @@
                 return output.trim();
             }
         }
+export { EmulatorDebugger };
