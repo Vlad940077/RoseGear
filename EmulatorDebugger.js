@@ -1,4 +1,4 @@
-        export class EmulatorDebugger {
+         class EmulatorDebugger {
             constructor(scene) {
                 this.scene = scene;
                 this.windows = [];
@@ -489,7 +489,7 @@
                 return output.trim();
             }
         }
-        export class DebugWindow {
+        class DebugWindow {
             constructor(scene, x, y, width, height) {
                 this.scene = scene;
                 this.x = x;
